@@ -297,7 +297,14 @@ def render_job_triggers_page(job_manager, approval_manager, db_manager):
     
     if not recent_requests.empty:
         # Format the dataframe for better display
-        display_df = recent_requests[['request_id', 'job1_name', 'job2_name', 'status', 'created_at']].copy()
+        display_cols = ['request_id', 'status', 'created_at']
+        # Add job name columns if they exist
+        if 'job1_name' in recent_requests.columns:
+            display_cols.insert(1, 'job1_name')
+        if 'job2_name' in recent_requests.columns:
+            display_cols.insert(2, 'job2_name')
+            
+        display_df = recent_requests[display_cols].copy()
         display_df['request_id'] = display_df['request_id'].str[:8] + '...'
         display_df['created_at'] = pd.to_datetime(display_df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
         
@@ -641,7 +648,9 @@ def render_admin_panel(db_manager, job_manager):
             recent_requests = db_manager.get_request_history(days=7)
             if not recent_requests.empty:
                 st.write("**Recent Activity (Last 7 days):**")
-                st.dataframe(recent_requests[['request_id', 'requester_id', 'status', 'created_at']].head(10))
+                display_cols = ['request_id', 'requester_id', 'status', 'created_at']
+                available_cols = [col for col in display_cols if col in recent_requests.columns]
+                st.dataframe(recent_requests[available_cols].head(10))
             else:
                 st.info("No recent activity")
     

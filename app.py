@@ -133,7 +133,7 @@ def render_job_triggers_page(job_manager, approval_manager, db_manager):
     # Show recent requests for current user
     st.subheader("📋 Your Recent Requests")
     recent_requests = db_manager.get_user_requests(st.session_state.user_id, limit=5)
-    if recent_requests:
+    if not recent_requests.empty:
         st.dataframe(recent_requests)
     else:
         st.info("No recent requests found.")
