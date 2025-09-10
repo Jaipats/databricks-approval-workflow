@@ -64,11 +64,11 @@ def validate_app_files():
     print("📋 Validating app files...")
     
     required_files = [
-        "databricks_app.py",
-        "backend/databricks_storage.py",
-        "backend/sdk_job_manager.py",
-        "databricks_requirements.txt",
-        "databricks_app_config.yml"
+        "app.py",
+        "backend/storage.py", 
+        "backend/job_manager.py",
+        "requirements.txt",
+        "app_config.yml"
     ]
     
     missing_files = []

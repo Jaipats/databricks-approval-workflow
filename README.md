@@ -1,285 +1,310 @@
-# Databricks Job Approval Workflow App
+# Databricks Job Approval Workflow - Databricks Apps Version
 
-A comprehensive Streamlit application for managing Databricks job execution with approval workflows. This app allows users to trigger jobs that require approval before executing subsequent dependent jobs, with full state management in Databricks Lakehouse.
+🚀 **Native Databricks Apps Deployment** - Optimized for Unity Catalog and Databricks Runtime
 
-## 🚀 Features
+## Overview
 
-- **Job Triggering**: Trigger two dependent Databricks jobs with approval workflow
-- **Approval Process**: Built-in approval system with user roles and permissions  
-- **State Management**: All approval states stored in Databricks Delta tables
-- **Real-time Monitoring**: Track job status and approval workflow progress
-- **User Management**: Role-based access control (requester, approver, admin)
-- **Audit Trail**: Complete audit log of all actions and state changes
-- **Notifications**: Configurable notifications (console, Slack, email)
+This version is specifically designed to run as a **Databricks App**, leveraging:
+- **Unity Catalog** for state storage (no local files)
+- **Databricks Runtime** context for authentication
+- **Native Databricks SDK** integration
+- **Streamlit** for the web interface
+- **Built-in user authentication** via Databricks
 
-## 🏗️ Architecture
+## Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Streamlit UI  │────│  Backend APIs   │────│ Databricks Jobs │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                    ┌─────────────────┐
-                    │ Delta Tables    │
-                    │ (Lakehouse)     │
-                    └─────────────────┘
+📁 Databricks Apps Architecture
+├── 🎯 databricks_app.py          # Main Streamlit application
+├── 🗄️ backend/
+│   ├── databricks_storage.py     # Unity Catalog storage manager
+│   └── sdk_job_manager.py        # Databricks SDK job manager
+├── ⚙️ databricks_app_config.yml   # App configuration
+├── 📋 databricks_requirements.txt # Minimal dependencies
+└── 📚 README-DATABRICKS-APPS.md  # This guide
 ```
 
-## 📋 Workflow Process
+## Features
 
-1. **Job 1 Trigger**: User triggers the first job through the UI
-2. **Job 1 Execution**: First job runs and completes
-3. **Approval Required**: System creates approval request in Delta table
-4. **Approval Process**: Authorized users can approve or reject the request  
-5. **Job 2 Trigger**: Upon approval, second job is automatically triggered
-6. **Completion**: Workflow marked as completed when Job 2 finishes
+### ✅ Native Integration
+- **Unity Catalog Tables**: `main.approval_workflow.approval_requests` and `main.approval_workflow.audit_log`
+- **Databricks Authentication**: Uses current user context automatically
+- **Job Management**: Direct integration with Databricks Jobs API
+- **Role-based Access**: Automatic role detection based on user/groups
 
-## 🛠️ Installation & Setup
+### 🎯 Workflow Features
+- **Job Triggering**: Select and trigger jobs with parameters
+- **Approval Process**: Multi-step approval workflow with comments
+- **State Persistence**: All state stored in Unity Catalog Delta tables
+- **Audit Trail**: Complete audit log of all actions
+- **Real-time Updates**: Live status updates and notifications
 
-### Prerequisites
+## Deployment Guide
 
-- Python 3.8+
-- Access to a Databricks workspace
-- Databricks personal access token
-- Git
+### Step 1: Prepare Unity Catalog
 
-### Quick Start
+```sql
+-- Create the schema (if not exists)
+CREATE SCHEMA IF NOT EXISTS main.approval_workflow;
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd databricks-approval-app
-   ```
+-- Grant permissions to users/groups
+GRANT USE CATALOG ON CATALOG main TO `your-group`;
+GRANT USE SCHEMA ON SCHEMA main.approval_workflow TO `your-group`;
+GRANT CREATE TABLE ON SCHEMA main.approval_workflow TO `your-group`;
+```
 
-2. **Run setup script**
-   ```bash
-   chmod +x setup.sh
-   ./setup.sh
-   ```
+### Step 2: Deploy as Databricks App
 
-3. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your Databricks credentials
-   ```
+#### Option A: Using Databricks CLI
 
-4. **Start the application**
-   ```bash
-   ./run.sh
-   ```
+```bash
+# Install/update Databricks CLI
+curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
 
-5. **Open in browser**
-   ```
-   http://localhost:8501
-   ```
+# Deploy the app
+databricks apps create databricks-job-approval-workflow \
+  --source-code-path ./databricks-approval-app \
+  --config-file databricks_app_config.yml
+```
 
-### Manual Installation
+#### Option B: Using Databricks UI
 
-1. **Create virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\\Scripts\\activate
-   ```
+1. **Navigate to Apps** in your Databricks workspace
+2. **Click "Create App"**
+3. **Choose "Upload from Local"**
+4. **Select the `databricks-approval-app` folder**
+5. **Configure app settings:**
+   - **Name**: `databricks-job-approval-workflow`
+   - **Entry Point**: `databricks_app.py`
+   - **Resources**: 2GB RAM, 1 CPU core (adjust as needed)
 
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+#### Option C: Using Repos
 
-3. **Configure environment variables**
-   ```bash
-   export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
-   export DATABRICKS_TOKEN="your-access-token"
-   ```
+1. **Clone this repo** to Databricks Repos
+2. **Navigate to Apps** → **Create App** → **From Repo**
+3. **Select** the `databricks-approval-app` folder
+4. **Configure** according to `databricks_app_config.yml`
 
-4. **Run the application**
-   ```bash
-   streamlit run app.py
-   ```
+### Step 3: Configure Permissions
 
-## ⚙️ Configuration
+#### Job Permissions
+```sql
+-- Grant job execution permissions
+GRANT EXECUTE ON JOB your_job_id_1 TO `approval-workflow-app`;
+GRANT EXECUTE ON JOB your_job_id_2 TO `approval-workflow-app`;
+```
+
+#### Unity Catalog Permissions
+```sql
+-- Grant table permissions
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE main.approval_workflow.approval_requests TO `approval-workflow-users`;
+GRANT SELECT, INSERT ON TABLE main.approval_workflow.audit_log TO `approval-workflow-users`;
+```
+
+### Step 4: User Role Configuration
+
+The app automatically determines user roles:
+
+- **🔧 Admin**: Users with `admin` in email or member of admin groups
+- **✅ Approver**: Users with `approver`/`manager` in email or member of approver groups  
+- **👤 Requester**: All other authenticated users
+
+Customize role logic in `databricks_app.py`:
+
+```python
+def get_user_role(user_email: str) -> str:
+    # Customize this function based on your organization
+    # Integration with Databricks groups:
+    # - Check group membership via Databricks SDK
+    # - Use Unity Catalog permissions
+    # - Custom role mapping logic
+```
+
+## Usage Guide
+
+### 🎯 Triggering Jobs
+
+1. **Navigate** to **"Trigger Jobs"** page
+2. **Select** your jobs from the dropdown (populated from workspace)
+3. **Configure** job parameters (JSON format)
+4. **Click** "Start Approval Workflow"
+5. **Monitor** progress in the dashboard
+
+### ✅ Approving Workflows
+
+1. **Access** the **"Approvals"** page (requires approver role)
+2. **Review** pending approval requests
+3. **Check** Job 1 completion status
+4. **Add** approval comments
+5. **Choose** Approve/Reject
+6. **Job 2** triggers automatically on approval
+
+### 📊 Monitoring & Analytics
+
+1. **View** workflow history in **"History"** page
+2. **Filter** by status, date range, or user
+3. **Analyze** approval patterns and success rates
+4. **Export** data for reporting
+
+### ⚙️ Administration
+
+1. **Access** admin panel (admin role required)
+2. **View** system statistics and health
+3. **Manage** data (clear workflows if needed)
+4. **Monitor** Unity Catalog usage
+
+## Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABRICKS_HOST` | Your Databricks workspace URL | Required |
-| `DATABRICKS_TOKEN` | Databricks access token | Required |
-| `CATALOG_NAME` | Lakehouse catalog name | `main` |
-| `SCHEMA_NAME` | Schema for approval tables | `approval_workflow` |
-| `APPROVAL_TIMEOUT_HOURS` | Hours before approval expires | `72` |
-| `ENABLE_NOTIFICATIONS` | Enable notification system | `true` |
-| `NOTIFICATION_HANDLERS` | Notification methods | `console` |
-
-### User Roles
-
-- **Requester**: Can create job trigger requests
-- **Approver**: Can approve/reject requests and create requests  
-- **Admin**: Full access to all features and admin panel
-
-## 📊 Database Schema
-
-The app creates two main Delta tables:
-
-### approval_requests
-Stores all approval workflow requests and their current state.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| request_id | String | Unique request identifier |
-| requester_id | String | User who created the request |
-| approver_id | String | User who approved/rejected |
-| job1_id | String | First job ID |
-| job1_run_id | String | First job run ID |
-| job2_id | String | Second job ID |  
-| job2_run_id | String | Second job run ID |
-| status | String | pending/approved/rejected/completed |
-| created_at | Timestamp | Request creation time |
-| approved_at | Timestamp | Approval time |
-
-### job_audit_log
-Complete audit trail of all job and approval actions.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| log_id | String | Unique log entry ID |
-| request_id | String | Associated request ID |
-| job_id | String | Job ID |
-| action | String | Action performed |
-| user_id | String | User who performed action |
-| timestamp | Timestamp | When action occurred |
-
-## 🎯 Usage Examples
-
-### Basic Workflow
-
-1. **Navigate to "Job Triggers"**
-2. **Enter job configurations**:
-   - Job 1 ID: `12345`
-   - Job 1 Parameters: `{"input_path": "/data/raw"}`
-   - Job 2 ID: `67890`
-   - Job 2 Parameters: `{"model_path": "/models/latest"}`
-3. **Click "Trigger First Job"**
-4. **Monitor in "Approval Dashboard"** (as approver)
-5. **Approve request** once Job 1 completes
-6. **Track completion** in "Job History"
-
-### API Integration
-
-The backend provides REST-like interfaces that can be integrated:
+The app uses Databricks runtime context by default, but you can override:
 
 ```python
-# Example: Create approval request programmatically
-from backend.approval_manager import ApprovalManager
-from backend.database_manager import DatabaseManager
-
-approval_mgr = ApprovalManager()
-db_mgr = DatabaseManager()
-
-# Create request
-request_id, approval_data = approval_mgr.create_approval_request(
-    requester_id="user@company.com",
-    job1_config={"job_id": "123", "params": {"key": "value"}},
-    job2_config={"job_id": "456", "params": {"key": "value"}}
-)
-
-# Store in database
-db_mgr.create_approval_request(approval_data)
+# Optional environment variables
+DATABRICKS_CATALOG = "main"              # Unity Catalog catalog
+DATABRICKS_SCHEMA = "approval_workflow"  # Schema name
+USE_MOCK_JOBS = "false"                 # Use mock jobs for testing
 ```
 
-## 🔧 Development
+### Unity Catalog Configuration
 
-### Project Structure
-```
-databricks-approval-app/
-├── app.py                 # Main Streamlit application
-├── backend/              # Backend modules
-│   ├── job_manager.py    # Databricks Jobs API integration  
-│   ├── approval_manager.py # Approval workflow logic
-│   └── database_manager.py # Delta table operations
-├── config/               # Configuration files
-├── deploy/              # Deployment scripts
-├── requirements.txt     # Python dependencies
-└── README.md           # This file
-```
+Default configuration creates tables in:
+- **Catalog**: `main`
+- **Schema**: `approval_workflow`
+- **Tables**: 
+  - `approval_requests` - Main workflow state
+  - `audit_log` - Complete audit trail
 
-### Testing
+Modify in `databricks_storage.py` if needed:
 
-Run with mock jobs for development:
-```bash
-export USE_MOCK_JOBS=true
-streamlit run app.py
+```python
+class DatabricksStorage:
+    def __init__(self, catalog: str = "your_catalog", schema: str = "your_schema"):
+        # Customize catalog/schema names
 ```
 
-### Adding New Features
+## Security & Compliance
 
-1. **Backend Logic**: Add to appropriate manager class
-2. **UI Components**: Update `app.py` with new pages/components
-3. **Database Changes**: Update schema in `database_manager.py`
-4. **Configuration**: Add new settings to `app_config.py`
+### ✅ Data Security
+- **Unity Catalog Integration**: Leverages Databricks governance
+- **Table-level Security**: Row-level and column-level access controls
+- **Audit Logging**: Complete audit trail in Unity Catalog
+- **User Authentication**: Native Databricks authentication
 
-## 📱 Databricks App Deployment
+### ✅ Access Control
+- **Role-based Access**: Different permissions for different user types
+- **Job Permissions**: Only authorized users can trigger specific jobs
+- **Data Isolation**: Proper separation of workflow data
 
-To deploy as a Databricks App:
+### ✅ Compliance
+- **Audit Trail**: All actions logged with timestamps and user IDs
+- **Data Lineage**: Unity Catalog tracks all data changes
+- **Retention Policies**: Configurable data retention via Unity Catalog
 
-1. **Upload code** to Databricks workspace
-2. **Configure environment** variables in Databricks
-3. **Create Databricks App** using the deployment configuration
-4. **Set up Delta tables** in your Databricks catalog
+## Monitoring & Troubleshooting
 
-See `deploy/databricks_config.py` for detailed deployment configuration.
+### Health Checks
 
-## 🔒 Security Considerations
-
-- **Access Tokens**: Store Databricks tokens securely
-- **Role Validation**: Implement proper user role verification  
-- **Audit Trail**: All actions are logged for compliance
-- **Session Management**: Configure appropriate session timeouts
-
-## 🐛 Troubleshooting
+Monitor app health via:
+1. **Databricks Apps Dashboard** - App status and resource usage
+2. **Unity Catalog** - Table sizes and query performance
+3. **Jobs API** - Job execution success rates
+4. **App Logs** - Streamlit application logs
 
 ### Common Issues
 
-1. **Connection Failed**: Check Databricks host URL and token
-2. **Permission Denied**: Verify token has necessary permissions
-3. **Table Not Found**: Ensure catalog and schema exist
-4. **Job Not Found**: Verify job IDs exist in workspace
+#### ❌ "Spark session required"
+**Solution**: Ensure running in Databricks Apps environment with Spark runtime
 
-### Debug Mode
+#### ❌ Unity Catalog permissions
+**Solution**: Grant proper CREATE TABLE and SELECT/INSERT permissions
 
-Enable debug mode for additional logging:
+#### ❌ Job trigger failures  
+**Solution**: Verify job IDs and execution permissions
+
+#### ❌ User role detection
+**Solution**: Customize `get_user_role()` function for your organization
+
+### Performance Optimization
+
+1. **Table Optimization**:
+   ```sql
+   OPTIMIZE main.approval_workflow.approval_requests;
+   OPTIMIZE main.approval_workflow.audit_log;
+   ```
+
+2. **Resource Allocation**: Adjust app resources based on usage:
+   ```yaml
+   resources:
+     requests:
+       memory: "4Gi"  # Increase for heavy usage
+       cpu: "2000m"
+   ```
+
+3. **Query Performance**: Add indexes if needed:
+   ```sql
+   -- Add Z-order optimization for frequently filtered columns
+   OPTIMIZE main.approval_workflow.approval_requests ZORDER BY (status, created_at);
+   ```
+
+## Migration from Local Version
+
+To migrate from the local CSV version:
+
+### Step 1: Export Existing Data
 ```bash
-export DEBUG_MODE=true
-export LOG_LEVEL=DEBUG
-streamlit run app.py
+# From local version directory
+python -c "
+import pandas as pd
+import os
+if os.path.exists('local_data'):
+    approval_df = pd.read_csv('local_data/approval_requests.csv')
+    audit_df = pd.read_csv('local_data/audit_log.csv')
+    approval_df.to_json('approval_requests_export.json', orient='records')
+    audit_df.to_json('audit_log_export.json', orient='records')
+    print('Data exported to JSON files')
+"
 ```
 
-## 📞 Support
+### Step 2: Import to Unity Catalog
+```python
+# In Databricks notebook or via the app's admin panel
+import pandas as pd
+from backend.databricks_storage import DatabricksStorage
 
-For issues and questions:
+# Initialize storage
+storage = DatabricksStorage()
+storage.initialize()
 
-1. Check the troubleshooting section
-2. Review Databricks logs in the workspace  
-3. Enable debug mode for detailed error messages
-4. Check the audit log table for workflow state
+# Load and import data
+approval_data = pd.read_json('approval_requests_export.json')
+for _, row in approval_data.iterrows():
+    storage.create_request(row.to_dict())
 
-## 🔮 Future Enhancements
+print("Migration complete!")
+```
 
-- [ ] Multi-step approval workflows
-- [ ] Integration with external approval systems
-- [ ] Advanced scheduling capabilities  
-- [ ] Mobile-responsive design improvements
-- [ ] Integration with Databricks Unity Catalog permissions
-- [ ] Webhook support for external integrations
-- [ ] Advanced analytics and reporting dashboard
+## Support & Development
 
-## 📄 License
+### Development Setup
+```bash
+# For local development (testing)
+pip install -r databricks_requirements.txt
+streamlit run databricks_app.py
+```
 
-This project is provided as-is for demonstration and educational purposes.
+### Contributing
+1. **Test locally** using mock mode: `USE_MOCK_JOBS=true`
+2. **Follow** Databricks Apps best practices
+3. **Update** Unity Catalog schema if needed
+4. **Test** with real Databricks jobs before deployment
+
+### Support
+- **Documentation**: This README and inline code comments
+- **Unity Catalog**: Databricks documentation for table management  
+- **Databricks SDK**: Official SDK documentation
+- **Databricks Apps**: Platform-specific deployment guides
 
 ---
 
-**Built with ❤️ for the Databricks community**
+🚀 **Ready to deploy!** Follow the deployment guide above to get your job approval workflow running natively in Databricks Apps.

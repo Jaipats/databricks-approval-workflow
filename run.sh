@@ -1,53 +1,46 @@
-#!/bin/bash  
-# Run script for Databricks Approval Workflow App
+#!/bin/bash
+# Run script for Databricks Job Approval Workflow
 
-echo "🚀 Starting Databricks Approval Workflow App..."
+set -e
 
-# Activate virtual environment if it exists
-if [ -d "venv" ]; then
-    source venv/bin/activate
-    echo "✅ Virtual environment activated"
+echo "🚀 Starting Databricks Job Approval Workflow"
+echo "=============================================="
+
+# Check if virtual environment exists
+if [ ! -d "venv" ]; then
+    echo "❌ Virtual environment not found. Run ./setup.sh first"
+    exit 1
 fi
 
-# Check if .env file exists
-if [ ! -f .env ]; then
-    echo "⚠️  Warning: .env file not found. Using default configuration."
-    echo "   Copy .env.example to .env and update with your settings."
-    echo ""
+# Activate virtual environment
+echo "🔗 Activating virtual environment..."
+source venv/bin/activate
+
+# Check if app.py exists
+if [ ! -f "app.py" ]; then
+    echo "❌ app.py not found"
+    exit 1
 fi
 
-# Load environment variables from .env file if it exists
-if [ -f .env ]; then
-    echo "📝 Loading environment variables from .env"
-    export $(grep -v '^#' .env | xargs)
-fi
+# Set environment variables for local development
+export DATABRICKS_CATALOG=${DATABRICKS_CATALOG:-"main"}
+export DATABRICKS_SCHEMA=${DATABRICKS_SCHEMA:-"approval_workflow"}
+export USE_MOCK_JOBS=${USE_MOCK_JOBS:-"false"}
 
-# Check for required environment variables
-if [ -z "$DATABRICKS_HOST" ] || [ "$DATABRICKS_HOST" = "https://your-workspace.cloud.databricks.com" ]; then
-    echo "⚠️  Warning: DATABRICKS_HOST not configured properly"
-    echo "   Please update .env file with your Databricks workspace URL"
-fi
-
-if [ -z "$DATABRICKS_TOKEN" ] || [ "$DATABRICKS_TOKEN" = "your-databricks-access-token" ]; then
-    echo "⚠️  Warning: DATABRICKS_TOKEN not configured"
-    echo "   Please update .env file with your Databricks access token"
-    echo ""
-    echo "To generate a token:"
-    echo "1. Go to your Databricks workspace"
-    echo "2. Click your profile > User Settings > Access tokens"
-    echo "3. Generate new token and copy to .env file"
-    echo ""
-fi
+echo "⚙️ Environment Configuration:"
+echo "   DATABRICKS_CATALOG: $DATABRICKS_CATALOG"
+echo "   DATABRICKS_SCHEMA: $DATABRICKS_SCHEMA"
+echo "   USE_MOCK_JOBS: $USE_MOCK_JOBS"
+echo ""
 
 # Start Streamlit app
-echo "🌐 Starting Streamlit application..."
-echo "📱 App will be available at: http://localhost:8501"
-echo ""
-echo "Press Ctrl+C to stop the application"
+echo "🌟 Starting Streamlit application..."
+echo "📍 App will be available at: http://localhost:8501"
 echo ""
 
 streamlit run app.py \
-    --server.port 8501 \
-    --server.headless true \
-    --server.enableCORS false \
-    --browser.gatherUsageStats false
+  --server.port=8501 \
+  --server.headless=false \
+  --browser.gatherUsageStats=false \
+  --server.enableCORS=false \
+  --server.enableXsrfProtection=false

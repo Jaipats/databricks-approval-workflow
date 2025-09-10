@@ -8,7 +8,7 @@ description: "Streamlit app for managing Databricks job execution with approval 
 # App configuration
 config:
   # Entry point
-  command: ["streamlit", "run", "databricks_app.py", "--server.port=8501", "--server.headless=true"]
+  command: ["streamlit", "run", "app.py", "--server.port=8501", "--server.headless=true"]
   
   # Environment
   env:

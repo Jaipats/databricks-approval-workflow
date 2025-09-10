@@ -1,202 +1,199 @@
 """
-Job Manager for Databricks Jobs API Integration
-Handles triggering and monitoring Databricks jobs
+Databricks Job Manager - Native Runtime Version
+Optimized for Databricks Apps environment with runtime context
 """
 
-import requests
 import json
 import time
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
-class JobManager:
-    """Manages Databricks Jobs API interactions"""
+try:
+    from databricks.sdk import WorkspaceClient
+    from databricks.sdk.service import jobs
+    from databricks.sdk.runtime import *
+    SDK_AVAILABLE = True
+    DATABRICKS_RUNTIME = True
+    print("✅ Using Databricks Runtime SDK")
+except ImportError:
+    try:
+        from databricks.sdk import WorkspaceClient
+        from databricks.sdk.service import jobs
+        SDK_AVAILABLE = True
+        DATABRICKS_RUNTIME = False
+        print("✅ Using Databricks SDK (external)")
+    except ImportError:
+        SDK_AVAILABLE = False
+        DATABRICKS_RUNTIME = False
+        print("❌ Databricks SDK not available")
+
+class DatabricksJobManager:
+    """Native Databricks job manager using runtime context"""
     
-    def __init__(self, databricks_host: str, access_token: str):
-        """
-        Initialize JobManager
+    def __init__(self):
+        if not SDK_AVAILABLE:
+            raise RuntimeError("❌ Databricks SDK required for Databricks Apps")
         
-        Args:
-            databricks_host: Databricks workspace URL (e.g., https://your-workspace.cloud.databricks.com)
-            access_token: Databricks personal access token or service principal token
-        """
-        self.host = databricks_host.rstrip('/')
-        self.token = access_token
-        self.headers = {
-            'Authorization': f'Bearer {self.token}',
-            'Content-Type': 'application/json'
-        }
-        
-        # API endpoints
-        self.jobs_api = f"{self.host}/api/2.1/jobs"
-        self.runs_api = f"{self.host}/api/2.1/jobs/runs"
-    
-    def _make_request(self, method: str, url: str, data: Optional[Dict] = None) -> Dict:
-        """Make HTTP request to Databricks API"""
         try:
-            if method.upper() == 'GET':
-                response = requests.get(url, headers=self.headers, params=data)
-            elif method.upper() == 'POST':
-                response = requests.post(url, headers=self.headers, json=data)
+            if DATABRICKS_RUNTIME:
+                # Use Databricks runtime context
+                self.client = WorkspaceClient()
+                print("✅ Connected using Databricks runtime context")
             else:
-                raise ValueError(f"Unsupported HTTP method: {method}")
-            
-            response.raise_for_status()
-            return response.json()
-            
-        except requests.exceptions.RequestException as e:
-            print(f"❌ API request failed: {str(e)}")
-            if hasattr(e.response, 'text'):
-                print(f"Response: {e.response.text}")
-            return {"error": str(e)}
+                # Use configured profile or environment
+                self.client = WorkspaceClient()
+                print("✅ Connected using Databricks SDK")
+                
+        except Exception as e:
+            raise RuntimeError(f"❌ Failed to initialize Databricks client: {str(e)}")
     
-    def list_jobs(self, limit: int = 25) -> List[Dict]:
+    def validate_connection(self) -> bool:
+        """Validate connection to Databricks workspace"""
+        try:
+            # Test connection by listing a few jobs
+            jobs_list = list(self.client.jobs.list(limit=1))
+            print(f"✅ Connection validated - workspace accessible")
+            return True
+        except Exception as e:
+            print(f"❌ Connection validation failed: {str(e)}")
+            return False
+    
+    def list_jobs(self, limit: int = 100, name_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         """List all jobs in the workspace"""
         try:
-            url = f"{self.jobs_api}/list"
-            params = {"limit": limit, "expand_tasks": False}
+            jobs_list = []
             
-            response = self._make_request('GET', url, params)
+            for job in self.client.jobs.list(limit=limit):
+                job_info = {
+                    'job_id': str(job.job_id),
+                    'name': job.settings.name,
+                    'created_time': job.created_time,
+                    'creator_user_name': getattr(job, 'creator_user_name', 'Unknown'),
+                    'job_type': self._determine_job_type(job.settings)
+                }
+                
+                # Apply name filter if specified
+                if name_filter is None or name_filter.lower() in job.settings.name.lower():
+                    jobs_list.append(job_info)
             
-            if "error" in response:
-                return []
-            
-            return response.get("jobs", [])
+            print(f"✅ Found {len(jobs_list)} jobs (filtered from workspace)")
+            return jobs_list
             
         except Exception as e:
             print(f"❌ Error listing jobs: {str(e)}")
             return []
     
-    def get_job_details(self, job_id: str) -> Optional[Dict]:
+    def get_job_details(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed information about a specific job"""
         try:
-            url = f"{self.jobs_api}/get"
-            params = {"job_id": job_id}
+            job = self.client.jobs.get(job_id)
             
-            response = self._make_request('GET', url, params)
+            details = {
+                'job_id': str(job.job_id),
+                'name': job.settings.name,
+                'description': getattr(job.settings, 'description', ''),
+                'created_time': job.created_time,
+                'creator_user_name': getattr(job, 'creator_user_name', 'Unknown'),
+                'job_type': self._determine_job_type(job.settings),
+                'timeout_seconds': getattr(job.settings, 'timeout_seconds', None),
+                'max_concurrent_runs': getattr(job.settings, 'max_concurrent_runs', 1),
+                'tasks': self._extract_task_info(job.settings)
+            }
             
-            if "error" in response:
-                return None
-            
-            return response
+            return details
             
         except Exception as e:
             print(f"❌ Error getting job details for {job_id}: {str(e)}")
             return None
     
-    def trigger_job(self, job_id: str, parameters: Optional[Dict] = None, 
-                   notebook_params: Optional[Dict] = None,
-                   jar_params: Optional[List] = None,
-                   python_params: Optional[List] = None) -> Optional[str]:
-        """
-        Trigger a Databricks job run
-        
-        Args:
-            job_id: The ID of the job to trigger
-            parameters: Job-level parameters
-            notebook_params: Notebook parameters for notebook jobs
-            jar_params: JAR parameters for JAR jobs  
-            python_params: Python parameters for Python jobs
-            
-        Returns:
-            Run ID if successful, None if failed
-        """
+    def trigger_job(self, job_id: str, parameters: Optional[Dict[str, Any]] = None) -> Optional[str]:
+        """Trigger a job and return the run ID"""
         try:
-            url = f"{self.runs_api}/run-now"
+            # Prepare run parameters
+            run_params = {}
             
-            payload = {
-                "job_id": int(job_id)
-            }
-            
-            # Add parameters if provided
             if parameters:
-                payload.update(parameters)
+                if 'notebook_params' in parameters:
+                    run_params['notebook_params'] = parameters['notebook_params']
+                if 'spark_submit_params' in parameters:
+                    run_params['spark_submit_params'] = parameters['spark_submit_params']
+                if 'python_params' in parameters:
+                    run_params['python_params'] = parameters['python_params']
+                if 'jar_params' in parameters:
+                    run_params['jar_params'] = parameters['jar_params']
             
-            if notebook_params:
-                payload["notebook_params"] = notebook_params
+            # Trigger the job
+            run = self.client.jobs.run_now(job_id=int(job_id), **run_params)
+            run_id = str(run.run_id)
             
-            if jar_params:
-                payload["jar_params"] = jar_params
-                
-            if python_params:
-                payload["python_params"] = python_params
-            
-            response = self._make_request('POST', url, payload)
-            
-            if "error" in response:
-                print(f"❌ Failed to trigger job {job_id}: {response['error']}")
-                return None
-            
-            run_id = response.get("run_id")
-            print(f"✅ Job {job_id} triggered successfully. Run ID: {run_id}")
-            
-            return str(run_id)
+            print(f"✅ Job {job_id} triggered successfully - Run ID: {run_id}")
+            return run_id
             
         except Exception as e:
             print(f"❌ Error triggering job {job_id}: {str(e)}")
             return None
     
-    def get_job_run_status(self, run_id: str) -> Optional[str]:
+    def get_run_status(self, run_id: str) -> Optional[str]:
         """Get the current status of a job run"""
         try:
-            url = f"{self.runs_api}/get"
-            params = {"run_id": run_id}
+            run = self.client.jobs.get_run(run_id=int(run_id))
             
-            response = self._make_request('GET', url, params)
-            
-            if "error" in response:
-                return None
-            
-            state = response.get("state", {})
-            life_cycle_state = state.get("life_cycle_state", "UNKNOWN")
-            result_state = state.get("result_state")
-            
-            # Map Databricks states to simplified states
-            if life_cycle_state in ["PENDING", "RUNNING"]:
-                return "running"
-            elif life_cycle_state == "TERMINATED":
-                if result_state == "SUCCESS":
-                    return "completed"
-                else:
-                    return "failed"
-            elif life_cycle_state in ["SKIPPED", "INTERNAL_ERROR"]:
-                return "failed"
-            else:
-                return "unknown"
+            # Extract lifecycle state
+            state = run.state
+            if state.life_cycle_state:
+                status = state.life_cycle_state.value.lower()
                 
+                # Map Databricks states to our simplified states
+                if status in ['pending', 'running', 'terminating']:
+                    return 'running'
+                elif status == 'terminated':
+                    if state.result_state:
+                        if state.result_state.value == 'SUCCESS':
+                            return 'completed'
+                        else:
+                            return 'failed'
+                    return 'completed'  # Default for terminated
+                elif status in ['skipped', 'internal_error']:
+                    return 'failed'
+                else:
+                    return status
+            
+            return 'unknown'
+            
         except Exception as e:
             print(f"❌ Error getting run status for {run_id}: {str(e)}")
             return None
     
-    def get_job_run_details(self, run_id: str) -> Optional[Dict]:
+    def get_run_details(self, run_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed information about a job run"""
         try:
-            url = f"{self.runs_api}/get"
-            params = {"run_id": run_id, "include_history": True}
+            run = self.client.jobs.get_run(run_id=int(run_id))
             
-            response = self._make_request('GET', url, params)
+            details = {
+                'run_id': str(run.run_id),
+                'job_id': str(run.job_id),
+                'run_name': getattr(run, 'run_name', ''),
+                'creator_user_name': getattr(run, 'creator_user_name', 'Unknown'),
+                'start_time': run.start_time,
+                'end_time': getattr(run, 'end_time', None),
+                'state': run.state.life_cycle_state.value if run.state and run.state.life_cycle_state else 'unknown',
+                'result_state': run.state.result_state.value if run.state and run.state.result_state else None,
+                'state_message': getattr(run.state, 'state_message', '') if run.state else '',
+                'run_duration': self._calculate_duration(run.start_time, getattr(run, 'end_time', None)),
+                'cluster_instance': self._extract_cluster_info(run),
+                'tasks': self._extract_run_task_info(run)
+            }
             
-            if "error" in response:
-                return None
-            
-            return response
+            return details
             
         except Exception as e:
             print(f"❌ Error getting run details for {run_id}: {str(e)}")
             return None
     
-    def cancel_job_run(self, run_id: str) -> bool:
+    def cancel_run(self, run_id: str) -> bool:
         """Cancel a running job"""
         try:
-            url = f"{self.runs_api}/cancel"
-            payload = {"run_id": int(run_id)}
-            
-            response = self._make_request('POST', url, payload)
-            
-            if "error" in response:
-                print(f"❌ Failed to cancel run {run_id}: {response['error']}")
-                return False
-            
+            self.client.jobs.cancel_run(run_id=int(run_id))
             print(f"✅ Job run {run_id} cancelled successfully")
             return True
             
@@ -204,204 +201,194 @@ class JobManager:
             print(f"❌ Error cancelling run {run_id}: {str(e)}")
             return False
     
-    def list_job_runs(self, job_id: Optional[str] = None, 
-                     active_only: bool = False, limit: int = 25) -> List[Dict]:
-        """List job runs, optionally filtered by job ID"""
+    def get_recent_runs(self, job_id: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
+        """Get recent job runs"""
         try:
-            url = f"{self.runs_api}/list"
-            params = {
-                "limit": limit,
-                "expand_tasks": False
-            }
+            runs_list = []
             
             if job_id:
-                params["job_id"] = job_id
+                # Get runs for specific job
+                for run in self.client.jobs.list_runs(job_id=int(job_id), limit=limit):
+                    runs_list.append(self._format_run_info(run))
+            else:
+                # Get all recent runs (this might be limited by API)
+                for run in self.client.jobs.list_runs(limit=limit):
+                    runs_list.append(self._format_run_info(run))
             
-            if active_only:
-                params["active_only"] = True
-            
-            response = self._make_request('GET', url, params)
-            
-            if "error" in response:
-                return []
-            
-            return response.get("runs", [])
+            return runs_list
             
         except Exception as e:
-            print(f"❌ Error listing job runs: {str(e)}")
+            print(f"❌ Error getting recent runs: {str(e)}")
             return []
     
-    def wait_for_job_completion(self, run_id: str, timeout_minutes: int = 60, 
-                               poll_interval_seconds: int = 30) -> str:
-        """
-        Wait for a job run to complete
-        
-        Args:
-            run_id: The run ID to wait for
-            timeout_minutes: Maximum time to wait in minutes
-            poll_interval_seconds: How often to check status
-            
-        Returns:
-            Final status: 'completed', 'failed', or 'timeout'
-        """
-        start_time = time.time()
+    def wait_for_completion(self, run_id: str, timeout_minutes: int = 60, poll_interval: int = 30) -> str:
+        """Wait for a job run to complete"""
         timeout_seconds = timeout_minutes * 60
+        start_time = time.time()
         
-        while True:
-            status = self.get_job_run_status(run_id)
+        print(f"⏳ Waiting for run {run_id} to complete (timeout: {timeout_minutes} min)")
+        
+        while time.time() - start_time < timeout_seconds:
+            status = self.get_run_status(run_id)
             
-            if status in ['completed', 'failed']:
+            if status in ['completed', 'failed', 'cancelled']:
+                print(f"✅ Run {run_id} finished with status: {status}")
                 return status
             
-            # Check timeout
-            elapsed = time.time() - start_time
-            if elapsed > timeout_seconds:
-                print(f"⏰ Timeout waiting for job run {run_id}")
-                return 'timeout'
-            
-            # Wait before next poll
-            time.sleep(poll_interval_seconds)
+            print(f"🔄 Run {run_id} status: {status} - waiting {poll_interval}s...")
+            time.sleep(poll_interval)
+        
+        print(f"⚠️ Timeout waiting for run {run_id} to complete")
+        return 'timeout'
     
-    def get_job_run_output(self, run_id: str) -> Optional[Dict]:
-        """Get the output of a job run"""
-        try:
-            url = f"{self.runs_api}/get-output"
-            params = {"run_id": run_id}
+    def _determine_job_type(self, settings) -> str:
+        """Determine the type of job based on its settings"""
+        if hasattr(settings, 'tasks') and settings.tasks:
+            # Multi-task job
+            task_types = []
+            for task in settings.tasks:
+                if hasattr(task, 'notebook_task') and task.notebook_task:
+                    task_types.append('notebook')
+                elif hasattr(task, 'spark_python_task') and task.spark_python_task:
+                    task_types.append('python')
+                elif hasattr(task, 'spark_submit_task') and task.spark_submit_task:
+                    task_types.append('spark_submit')
+                elif hasattr(task, 'spark_jar_task') and task.spark_jar_task:
+                    task_types.append('jar')
+                elif hasattr(task, 'python_wheel_task') and task.python_wheel_task:
+                    task_types.append('wheel')
+                else:
+                    task_types.append('other')
             
-            response = self._make_request('GET', url, params)
-            
-            if "error" in response:
-                return None
-            
-            return response
-            
-        except Exception as e:
-            print(f"❌ Error getting run output for {run_id}: {str(e)}")
+            return f"multi_task ({', '.join(set(task_types))})"
+        
+        # Single task job (legacy)
+        if hasattr(settings, 'notebook_task') and settings.notebook_task:
+            return 'notebook'
+        elif hasattr(settings, 'spark_python_task') and settings.spark_python_task:
+            return 'python'
+        elif hasattr(settings, 'spark_submit_task') and settings.spark_submit_task:
+            return 'spark_submit'
+        elif hasattr(settings, 'spark_jar_task') and settings.spark_jar_task:
+            return 'jar'
+        elif hasattr(settings, 'python_wheel_task') and settings.python_wheel_task:
+            return 'wheel'
+        else:
+            return 'unknown'
+    
+    def _extract_task_info(self, settings) -> List[Dict[str, Any]]:
+        """Extract task information from job settings"""
+        tasks = []
+        
+        if hasattr(settings, 'tasks') and settings.tasks:
+            for task in settings.tasks:
+                task_info = {
+                    'task_key': task.task_key,
+                    'task_type': self._get_task_type(task),
+                    'depends_on': [dep.task_key for dep in (task.depends_on or [])]
+                }
+                tasks.append(task_info)
+        else:
+            # Single task (legacy format)
+            tasks.append({
+                'task_key': 'main',
+                'task_type': self._determine_job_type(settings),
+                'depends_on': []
+            })
+        
+        return tasks
+    
+    def _get_task_type(self, task) -> str:
+        """Get the type of a specific task"""
+        if hasattr(task, 'notebook_task') and task.notebook_task:
+            return 'notebook'
+        elif hasattr(task, 'spark_python_task') and task.spark_python_task:
+            return 'python'
+        elif hasattr(task, 'spark_submit_task') and task.spark_submit_task:
+            return 'spark_submit'
+        elif hasattr(task, 'spark_jar_task') and task.spark_jar_task:
+            return 'jar'
+        elif hasattr(task, 'python_wheel_task') and task.python_wheel_task:
+            return 'wheel'
+        else:
+            return 'unknown'
+    
+    def _extract_cluster_info(self, run) -> Dict[str, Any]:
+        """Extract cluster information from run"""
+        cluster_info = {'type': 'unknown'}
+        
+        if hasattr(run, 'cluster_spec') and run.cluster_spec:
+            if hasattr(run.cluster_spec, 'existing_cluster_id'):
+                cluster_info = {
+                    'type': 'existing',
+                    'cluster_id': run.cluster_spec.existing_cluster_id
+                }
+            elif hasattr(run.cluster_spec, 'new_cluster'):
+                cluster_info = {
+                    'type': 'new',
+                    'node_type': getattr(run.cluster_spec.new_cluster, 'node_type_id', 'unknown'),
+                    'num_workers': getattr(run.cluster_spec.new_cluster, 'num_workers', 0)
+                }
+        
+        return cluster_info
+    
+    def _extract_run_task_info(self, run) -> List[Dict[str, Any]]:
+        """Extract task information from run"""
+        tasks = []
+        
+        if hasattr(run, 'tasks') and run.tasks:
+            for task in run.tasks:
+                task_info = {
+                    'task_key': task.task_key,
+                    'state': task.state.life_cycle_state.value if task.state and task.state.life_cycle_state else 'unknown',
+                    'start_time': getattr(task, 'start_time', None),
+                    'end_time': getattr(task, 'end_time', None)
+                }
+                tasks.append(task_info)
+        
+        return tasks
+    
+    def _format_run_info(self, run) -> Dict[str, Any]:
+        """Format run information for display"""
+        return {
+            'run_id': str(run.run_id),
+            'job_id': str(run.job_id),
+            'run_name': getattr(run, 'run_name', ''),
+            'state': run.state.life_cycle_state.value if run.state and run.state.life_cycle_state else 'unknown',
+            'start_time': run.start_time,
+            'end_time': getattr(run, 'end_time', None),
+            'duration': self._calculate_duration(run.start_time, getattr(run, 'end_time', None))
+        }
+    
+    def _calculate_duration(self, start_time, end_time) -> Optional[str]:
+        """Calculate duration between start and end times"""
+        if not start_time:
             return None
-    
-    def create_job(self, job_config: Dict) -> Optional[str]:
-        """Create a new job (for testing purposes)"""
-        try:
-            url = f"{self.jobs_api}/create"
+        
+        if end_time:
+            # Both times available
+            duration_ms = end_time - start_time
+            duration_seconds = duration_ms / 1000
             
-            response = self._make_request('POST', url, job_config)
+            if duration_seconds < 60:
+                return f"{duration_seconds:.1f}s"
+            elif duration_seconds < 3600:
+                return f"{duration_seconds/60:.1f}m"
+            else:
+                return f"{duration_seconds/3600:.1f}h"
+        else:
+            # Still running
+            current_time = int(time.time() * 1000)
+            duration_ms = current_time - start_time
+            duration_seconds = duration_ms / 1000
             
-            if "error" in response:
-                print(f"❌ Failed to create job: {response['error']}")
-                return None
-            
-            job_id = response.get("job_id")
-            print(f"✅ Job created successfully. Job ID: {job_id}")
-            
-            return str(job_id)
-            
-        except Exception as e:
-            print(f"❌ Error creating job: {str(e)}")
-            return None
-    
-    def validate_connection(self) -> bool:
-        """Test if the connection to Databricks is working"""
-        try:
-            # Try to list jobs as a connection test
-            jobs = self.list_jobs(limit=1)
-            return isinstance(jobs, list)  # Even empty list means connection works
-            
-        except Exception as e:
-            print(f"❌ Connection validation failed: {str(e)}")
-            return False
-    
-    def get_cluster_info(self, cluster_id: str) -> Optional[Dict]:
-        """Get information about a cluster (if needed for job dependencies)"""
-        try:
-            url = f"{self.host}/api/2.0/clusters/get"
-            params = {"cluster_id": cluster_id}
-            
-            response = self._make_request('GET', url, params)
-            
-            if "error" in response:
-                return None
-            
-            return response
-            
-        except Exception as e:
-            print(f"❌ Error getting cluster info for {cluster_id}: {str(e)}")
-            return None
-    
-    def get_job_permissions(self, job_id: str) -> Optional[Dict]:
-        """Get permissions for a job"""
-        try:
-            url = f"{self.host}/api/2.0/permissions/jobs/{job_id}"
-            
-            response = self._make_request('GET', url)
-            
-            if "error" in response:
-                return None
-            
-            return response
-            
-        except Exception as e:
-            print(f"❌ Error getting job permissions for {job_id}: {str(e)}")
-            return None
+            if duration_seconds < 60:
+                return f"{duration_seconds:.1f}s (running)"
+            elif duration_seconds < 3600:
+                return f"{duration_seconds/60:.1f}m (running)"
+            else:
+                return f"{duration_seconds/3600:.1f}h (running)"
 
 
-class MockJobManager(JobManager):
-    """Mock Job Manager for testing without actual Databricks connection"""
-    
-    def __init__(self):
-        # Don't call parent __init__ to avoid requiring credentials
-        self.mock_jobs = {
-            "12345": {"job_id": "12345", "name": "Data Processing Job", "creator_user_name": "test@example.com"},
-            "67890": {"job_id": "67890", "name": "ML Training Job", "creator_user_name": "test@example.com"}
-        }
-        self.mock_runs = {}
-        self.run_counter = 1000
-    
-    def list_jobs(self, limit: int = 25) -> List[Dict]:
-        """Mock job listing"""
-        return list(self.mock_jobs.values())[:limit]
-    
-    def get_job_details(self, job_id: str) -> Optional[Dict]:
-        """Mock job details"""
-        return self.mock_jobs.get(job_id)
-    
-    def trigger_job(self, job_id: str, parameters: Optional[Dict] = None, 
-                   **kwargs) -> Optional[str]:
-        """Mock job triggering"""
-        if job_id not in self.mock_jobs:
-            return None
-        
-        run_id = str(self.run_counter)
-        self.run_counter += 1
-        
-        self.mock_runs[run_id] = {
-            "run_id": run_id,
-            "job_id": job_id,
-            "status": "running",
-            "start_time": datetime.now().isoformat(),
-            "parameters": parameters or {}
-        }
-        
-        return run_id
-    
-    def get_job_run_status(self, run_id: str) -> Optional[str]:
-        """Mock run status - automatically complete after creation"""
-        run = self.mock_runs.get(run_id)
-        if not run:
-            return None
-        
-        # Auto-complete for demo purposes
-        if run["status"] == "running":
-            run["status"] = "completed"
-        
-        return run["status"]
-    
-    def validate_connection(self) -> bool:
-        """Mock connection validation"""
-        return True
-    
-    def cancel_job_run(self, run_id: str) -> bool:
-        """Mock job cancellation"""
-        if run_id in self.mock_runs:
-            self.mock_runs[run_id]["status"] = "cancelled"
-            return True
-        return False
+# Alias for backward compatibility
+SDKJobManager = DatabricksJobManager
