@@ -1,0 +1,60 @@
+# Databricks Apps Configuration
+# Deploy as native Databricks App
+
+name: databricks-job-approval-workflow
+display_name: "Job Approval Workflow"
+description: "Streamlit app for managing Databricks job execution with approval workflows using Unity Catalog"
+
+# App configuration
+config:
+  # Entry point
+  command: ["streamlit", "run", "databricks_app.py", "--server.port=8501", "--server.headless=true"]
+  
+  # Environment
+  env:
+    - name: STREAMLIT_SERVER_HEADLESS
+      value: "true"
+    - name: STREAMLIT_SERVER_ENABLE_CORS
+      value: "false"
+    - name: STREAMLIT_BROWSER_GATHER_USAGE_STATS
+      value: "false"
+  
+  # Resources
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+# Permissions required
+permissions:
+  - "jobs:read"
+  - "jobs:run"
+  - "sql:read"
+  - "sql:write"
+  - "unity_catalog:read"
+  - "unity_catalog:write"
+
+# Unity Catalog configuration
+unity_catalog:
+  catalog: "main"
+  schema: "approval_workflow"
+  
+  # Tables that will be created
+  tables:
+    - name: "approval_requests"
+      description: "Job approval workflow requests"
+    - name: "audit_log"
+      description: "Audit trail for all workflow actions"
+
+# App metadata
+tags:
+  - "workflow"
+  - "approval"
+  - "jobs"
+  - "governance"
+  
+author: "Data Engineering Team"
+version: "2.0.0"
