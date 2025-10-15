@@ -1,0 +1,60 @@
+{
+  "factset": [
+    {
+      "tool_id": "factset_corporate_filings",
+      "tool_name": "Factset corporate filings",
+      "tool_enabled": true,
+      "tool_type": "vector",
+      "tool_description": "Access to public filings and corporate disclosures with vector store capabilities",
+      "tool_coordinates": "financial_services.investment_analytics.factset_filings_vectors",
+      "tool_description_details": "Powered by Factset, this tool helps analysts get access to public filings and corporate disclosures with vector store capabilities",
+      "tool_columns": [
+        "document_name",
+        "document_type",
+        "company_name",
+        "section_number",
+        "symbol",
+        "content"
+      ]
+    },
+    {
+      "tool_id": "factset_street_account",
+      "tool_name": "Factset News Street Account",
+      "tool_enabled": false,
+      "tool_type": "vector",
+      "tool_description": "Access to latest public news with vector store capabilities",
+      "tool_description_details": "Powered by Factset, this tool helps analysts get access to latest public news",
+      "tool_coordinates": "financial_services.investment_analytics.factset_street_account",
+      "tool_columns": [
+        "document_name",
+        "document_type",
+        "company_name",
+        "section_number",
+        "symbol",
+        "content"
+      ]
+    }
+  ],
+  "bloomberg": [
+    {
+      "tool_id": "bloomberg_genie",
+      "tool_name": "Market Data (Genie)",
+      "tool_enabled": true,
+      "tool_type": "genie",
+      "tool_description": "Bloomberg market data and company fundamental available through Genie API",
+      "tool_description_details": "This agent leverages Bloomberg market data to run basic financial analysis across an entire US Equity based portfolio, answering questions about market prices, volatility or investment performance. This capability supports simple types of financial analysis queries, such as Computing daily returns, Identifying Top Performing Stocks, Computing market volatility, Identifying most traded instruments or Getting trades statistic by industry",
+      "tool_coordinates": "01f062641a77171588e5c1af61281f5e"
+    }
+  ],
+  "databricks": [
+    {
+      "tool_id": "databricks_portfolio",
+      "tool_name": "Equity holdings",
+      "tool_enabled": true,
+      "tool_type": "function",
+      "tool_description": "US equity portfolio data including positions, unlikely to be shared to data providers.",
+      "tool_description_details": "US equity portfolio data including positions, unlikely to be shared to data providers.",
+      "tool_coordinates": "financial_services.investment_analytics.get_portfolio_data"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+[class*="architecture"] p {
+    padding-top: 2px;
+}
+
+[class*="architecture"] p {
+    font-size: smaller;
+    text-decoration: underline;
+    color: rgb(0, 104, 201);
+}
+
+[class*="sb_data_intelligence"] {
+    border-radius: 20px;
+    border-style: solid;
+    border-width: 1px;
+    padding: 10px 10px 20px 10px;
+}
+
+[data-testid="stCheckbox"] p {
+    font-size: smaller;
+    padding-top: 2px;
+}
+
+[data-baseweb="radio"] p {
+    font-size: smaller;
+    padding-top: 2px;
+}
+
+div[data-testid="stRadio"] {
+    margin-top: -2rem;
+}
+
+div[data-testid="stDialog"] div[role="dialog"] {
+    width: 60% !important;
+    height: 60% !important;
+}

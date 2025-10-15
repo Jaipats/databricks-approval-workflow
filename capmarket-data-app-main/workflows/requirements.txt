@@ -1,0 +1,6 @@
+oauthlib
+requests
+requests-oauthlib
+PyJWT
+urllib3
+sseclient-py==1.7

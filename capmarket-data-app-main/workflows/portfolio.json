@@ -1,0 +1,126 @@
+[
+  {
+    "ticker": "BG US Equity",
+    "number_of_shares": 4469
+  },
+  {
+    "ticker": "ROST US Equity",
+    "number_of_shares": 4395
+  },
+  {
+    "ticker": "BLK US Equity",
+    "number_of_shares": 2043
+  },
+  {
+    "ticker": "HON US Equity",
+    "number_of_shares": 4940
+  },
+  {
+    "ticker": "HD US Equity",
+    "number_of_shares": 6102
+  },
+  {
+    "ticker": "JCI US Equity",
+    "number_of_shares": 431
+  },
+  {
+    "ticker": "VLCN US Equity",
+    "number_of_shares": 8942
+  },
+  {
+    "ticker": "CCI US Equity",
+    "number_of_shares": 9047
+  },
+  {
+    "ticker": "BCDA US Equity",
+    "number_of_shares": 8359
+  },
+  {
+    "ticker": "AZO US Equity",
+    "number_of_shares": 744
+  },
+  {
+    "ticker": "KULR US Equity",
+    "number_of_shares": 4345
+  },
+  {
+    "ticker": "ATO US Equity",
+    "number_of_shares": 3970
+  },
+  {
+    "ticker": "TMUS US Equity",
+    "number_of_shares": 8964
+  },
+  {
+    "ticker": "ORLY US Equity",
+    "number_of_shares": 6927
+  },
+  {
+    "ticker": "EQIX US Equity",
+    "number_of_shares": 1998
+  },
+  {
+    "ticker": "MAA US Equity",
+    "number_of_shares": 3712
+  },
+  {
+    "ticker": "DD US Equity",
+    "number_of_shares": 8262
+  },
+  {
+    "ticker": "SRM US Equity",
+    "number_of_shares": 3086
+  },
+  {
+    "ticker": "CNMD US Equity",
+    "number_of_shares": 5041
+  },
+  {
+    "ticker": "ADSK US Equity",
+    "number_of_shares": 2520
+  },
+  {
+    "ticker": "HPQ US Equity",
+    "number_of_shares": 6653
+  },
+  {
+    "ticker": "UTI US Equity",
+    "number_of_shares": 8776
+  },
+  {
+    "ticker": "PSX US Equity",
+    "number_of_shares": 3393
+  },
+  {
+    "ticker": "WEC US Equity",
+    "number_of_shares": 8872
+  },
+  {
+    "ticker": "SIEB US Equity",
+    "number_of_shares": 3933
+  },
+  {
+    "ticker": "IMUX US Equity",
+    "number_of_shares": 8190
+  },
+  {
+    "ticker": "IRWD US Equity",
+    "number_of_shares": 9576
+  },
+  {
+    "ticker": "RHEP US Equity",
+    "number_of_shares": 407
+  },
+  {
+    "ticker": "SLB US Equity",
+    "number_of_shares": 3325
+  },
+  {
+    "ticker": "CRIS US Equity",
+    "number_of_shares": 1194
+  },
+  {
+    "ticker": "PROP US Equity",
+    "number_of_shares": 7106
+  }
+]
